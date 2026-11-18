@@ -1,6 +1,6 @@
 # Chrome 应用商店上架材料
 
-上架要在 [Chrome 开发者控制台](https://chrome.google.com/webstore/devconsole) 里由开发者本人操作。下面是每个表单项要填的内容，图片在 `docs/store/`，用 `scripts/store-assets.mjs` 重新生成。
+上架要在 [Chrome 开发者控制台](https://chrome.google.com/webstore/devconsole) 里由开发者本人操作；Chrome 禁止任何扩展操作商店页面，浏览器自动化（包括 Claude in Chrome）也点不了，只能手动。开发者账号是 `luojiaxuan1215@gmail.com`，控制台每次进入都可能要求通行密钥重新验证。下面是每个表单项要填的内容，图片在 `docs/store/`，用 `scripts/store-assets.mjs` 重新生成。
 
 ## 提交步骤
 
