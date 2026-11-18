@@ -196,6 +196,7 @@ function paperText(analysis) {
 function startTranslation() {
   state.translator?.stop();
   state.translator = null;
+  $('notice').hidden = true;
   const cfg = providerConfig();
   state.cfgKey = cfgKey(cfg);
   const problem = configProblem(cfg);
@@ -224,19 +225,23 @@ function startTranslation() {
   state.translator.start();
 }
 
-function updateProgress({ done, total, errors, firstError }) {
+function updateProgress({ done, total, errors, firstError, fatal }) {
   const bar = $('progress');
   bar.querySelector('.bar').style.width = `${total ? (100 * done) / total : 0}%`;
   bar.classList.toggle('done', done === total);
   const status = $('status');
-  status.textContent = done === total ? `已译完 ${total} 页` : `翻译中 ${done}/${total} 页`;
-  if (errors) {
-    const span = document.createElement('span');
-    span.className = 'err';
-    span.textContent = ` · ${errors} 页失败`;
-    span.title = firstError || '';
-    status.appendChild(span);
+  status.textContent = done === total ? `已译完 ${total} 页` : `${fatal ? '已停止' : '翻译中'} ${done}/${total} 页`;
+  if (errors && !fatal) {
+    const retry = document.createElement('button');
+    retry.type = 'button';
+    retry.className = 'err';
+    retry.textContent = ` · ${errors} 页失败，重试`;
+    retry.title = firstError || '';
+    retry.addEventListener('click', () => state.translator?.retryFailed());
+    status.appendChild(retry);
   }
+  $('notice').hidden = !fatal;
+  if (fatal) $('notice-text').textContent = fatal;
 }
 
 function startSummary(force = false) {
@@ -281,6 +286,7 @@ function setupToolbar() {
   const panel = $('summary');
   if (window.innerWidth < 1100) panel.classList.add('collapsed');
   $('toggle-summary').addEventListener('click', () => panel.classList.toggle('collapsed'));
+  $('notice-retry').addEventListener('click', () => state.translator?.retryFailed());
   $('summary-close').addEventListener('click', () => panel.classList.add('collapsed'));
   $('summary-regen').addEventListener('click', () => startSummary(true));
   $('summary-copy').addEventListener('click', async () => {

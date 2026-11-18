@@ -23,6 +23,7 @@ export class Translator {
     this.attempts = new Map();
     this.controller = new AbortController();
     this.workers = 0;
+    this.fatal = null;
     this.cachePrefix = `t|${cfg.id}|${cfg.kind === 'google' ? 'gtx' : cfg.translateModel}|v${PROMPT_VERSION}|`;
   }
 
@@ -64,10 +65,28 @@ export class Translator {
 
   retry(n) {
     if (this.state.get(n) !== 'error') return;
+    this.fatal = null;
     this.attempts.delete(n);
     this.setState(n, 'pending');
     this.report();
     this.pump();
+  }
+
+  retryFailed() {
+    this.fatal = null;
+    for (const [n, s] of this.state) {
+      if (s !== 'error') continue;
+      this.attempts.delete(n);
+      this.setState(n, 'pending');
+    }
+    this.report();
+    this.pump();
+  }
+
+  // A service-level refusal ends the run instead of failing page by page.
+  halt(message) {
+    this.fatal = message;
+    for (const [n, s] of this.state) if (s === 'pending') this.setState(n, 'error', message);
   }
 
   pump() {
@@ -109,9 +128,14 @@ export class Translator {
       if (this.controller.signal.aborted) return;
       const attempts = (this.attempts.get(n) || 0) + 1;
       this.attempts.set(n, attempts);
-      if (e.retryable && attempts < MAX_ATTEMPTS) {
+      if (e.fatal) {
+        this.setState(n, 'error', e.message);
+        this.halt(e.message);
+      } else if (e.retryable && attempts < MAX_ATTEMPTS) {
         await new Promise((r) => setTimeout(r, 1500 * 2 ** attempts));
-        if (!this.controller.signal.aborted) this.setState(n, 'pending');
+        if (this.controller.signal.aborted) return;
+        if (this.fatal) this.setState(n, 'error', this.fatal);
+        else this.setState(n, 'pending');
       } else {
         this.setState(n, 'error', e.message || String(e));
       }
@@ -176,7 +200,7 @@ export class Translator {
       else if (s === 'running') running++;
       else if (s === 'error') errors++;
     }
-    this.onProgress({ done, running, errors, total: this.state.size, firstError: this.errors.values().next().value });
+    this.onProgress({ done, running, errors, total: this.state.size, firstError: this.errors.values().next().value, fatal: this.fatal });
   }
 
 }

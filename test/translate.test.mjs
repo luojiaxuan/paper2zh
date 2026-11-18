@@ -56,3 +56,37 @@ test('transport errors are retried at page level, not bisected', async () => {
   assert.equal(calls, 1);
   assert.equal(t.state.get(1), 'error');
 });
+
+test('a service-level refusal stops the queue and retryFailed resumes it', async () => {
+  const analysis = { pages: [1, 2, 3, 4, 5].map((n) => page(n, [`p${n}`])) };
+  let blocked = true;
+  let calls = 0;
+  let last;
+  const t = new Translator({
+    analysis,
+    cfg: { id: 'fake', kind: 'google', concurrency: 1 },
+    paper: 'p',
+    priority: (n) => n,
+    onPage: () => {},
+    onState: () => {},
+    onProgress: (p) => { last = p; },
+  });
+  t.provider = {
+    async translate(blocks) {
+      calls++;
+      if (blocked) throw new ProviderError('blocked', { fatal: true });
+      return new Map(blocks.map((b) => [b.id, `中文:${b.text}`]));
+    },
+  };
+  await t.start();
+  await new Promise((r) => setTimeout(r, 50));
+  assert.equal(calls, 1);
+  assert.deepEqual([...t.state.values()], ['error', 'error', 'error', 'error', 'error']);
+  assert.equal(last.fatal, 'blocked');
+  blocked = false;
+  t.retryFailed();
+  await new Promise((r) => setTimeout(r, 50));
+  assert.equal(calls, 6);
+  assert.deepEqual([...t.state.values()], ['done', 'done', 'done', 'done', 'done']);
+  assert.equal(last.fatal, null);
+});

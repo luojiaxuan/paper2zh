@@ -67,11 +67,14 @@ const TRANSLATION_SCHEMA = {
 
 // retryable: worth repeating as is (rate limits, outages, network).
 // content: the model rejected or garbled this input; a smaller input may pass.
+// fatal: the service refuses every request (bad key, blocked network), so the
+// remaining pages would fail the same way.
 export class ProviderError extends Error {
-  constructor(message, { retryable = false, content = false } = {}) {
+  constructor(message, { retryable = false, content = false, fatal = false } = {}) {
     super(message);
     this.retryable = retryable;
     this.content = content;
+    this.fatal = fatal;
   }
 }
 
@@ -121,9 +124,9 @@ function fallbackParams(model) {
 
 function anthropicError(e) {
   const status = e?.status;
-  if (status === 401) return new ProviderError('API Key 无效（401）');
-  if (status === 403) return new ProviderError('这个 Key 没有权限使用该模型（403）');
-  if (status === 404) return new ProviderError('模型不存在，请检查模型名（404）');
+  if (status === 401) return new ProviderError('API Key 无效（401）', { fatal: true });
+  if (status === 403) return new ProviderError('这个 Key 没有权限使用该模型（403）', { fatal: true });
+  if (status === 404) return new ProviderError('模型不存在，请检查模型名（404）', { fatal: true });
   if (status === 429) return new ProviderError('请求太频繁或额度不足（429）', { retryable: true });
   if (status >= 500) return new ProviderError(`服务暂时不可用（${status}）`, { retryable: true });
   if (status === 400) return new ProviderError(`请求被拒绝：${e?.error?.error?.message || e.message}`, { content: true });
@@ -239,8 +242,8 @@ class OpenAICompatibleProvider {
     }
     if (!res.ok) {
       const detail = (await res.text().catch(() => '')).slice(0, 300);
-      if (res.status === 401) throw new ProviderError('API Key 无效（401）');
-      if (res.status === 404) throw new ProviderError(`接口或模型不存在（404）：${detail}`);
+      if (res.status === 401) throw new ProviderError('API Key 无效（401）', { fatal: true });
+      if (res.status === 404) throw new ProviderError(`接口或模型不存在（404）：${detail}`, { fatal: true });
       if (res.status === 429) throw new ProviderError('请求太频繁或额度不足（429）', { retryable: true });
       const flagged = /flagged|safety|policy|content_filter|refus/i.test(detail);
       if (res.status >= 500 && !flagged) throw new ProviderError(`服务暂时不可用（${res.status}）`, { retryable: true });
@@ -335,6 +338,11 @@ class OpenAICompatibleProvider {
 
 const plain = (b) => b.text.replace(/[_^]\{([^}]*)\}/g, '$1');
 
+const GOOGLE_BLOCKED =
+  'Google 翻译暂时拦下了来自你这个网络的请求：短时间内请求太多，被当成了异常流量，通常几小时内恢复。可以稍后点“重试”，或换成大模型服务。';
+const GOOGLE_UNREACHABLE =
+  '连不上 Google 翻译。可能是短时间内请求太多，被 Google 暂时拦截（通常几小时内恢复），也可能是网络到不了 Google。可以稍后点“重试”，或换成大模型服务。';
+
 class GoogleProvider {
   constructor() {
     this.name = 'Google 翻译';
@@ -345,12 +353,16 @@ class GoogleProvider {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
       body: `q=${encodeURIComponent(texts.join('\n'))}`,
+      redirect: 'manual',
       signal,
     }).catch((e) => {
       if (signal?.aborted) throw e;
-      throw new ProviderError('连不上 Google 翻译', { retryable: true });
+      throw new ProviderError(GOOGLE_UNREACHABLE, { fatal: true });
     });
-    if (res.status === 429) throw new ProviderError('Google 翻译请求太频繁，稍后重试', { retryable: true });
+    // Traffic Google considers abusive is redirected to its CAPTCHA page.
+    if (res.type === 'opaqueredirect' || res.status === 429 || res.status === 403) {
+      throw new ProviderError(GOOGLE_BLOCKED, { fatal: true });
+    }
     if (!res.ok) throw new ProviderError(`Google 翻译失败（${res.status}）`, { retryable: true });
     const data = await res.json();
     return (data[0] || []).map((seg) => seg[0] || '').join('').split('\n');
