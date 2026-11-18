@@ -131,7 +131,7 @@ async function openBytes(bytes, name) {
     return;
   }
   const meta = await state.doc.getMetadata().catch(() => null);
-  state.titleBlock = null;
+  state.titleBlocks = null;
   const heading = guessTitle(state.analysis);
   state.title = metaTitle(meta) || heading || name;
   state.paperText = paperText(state.analysis);
@@ -157,11 +157,14 @@ function guessTitle(analysis) {
   if (!first) return '';
   const top = first.blocks.filter((b) => b.bbox[1] < first.height * 0.4 && /[A-Za-z]{3}/.test(b.text));
   if (!top.length) return '';
-  const biggest = top.reduce((a, b) => (b.size > a.size ? b : a));
-  if (biggest.size < analysis.bodySize * 1.15) return '';
-  state.titleBlock = biggest;
-  return biggest.text.replace(/[_^]\{([^}]*)\}/g, '$1').replace(/\s+/g, ' ').trim();
+  const size = Math.max(...top.map((b) => b.size));
+  if (size < analysis.bodySize * 1.15) return '';
+  // A title can span several blocks (each centered line on its own).
+  state.titleBlocks = top.filter((b) => Math.abs(b.size - size) < 0.02 * size);
+  return joinText(state.titleBlocks.map((b) => b.text.replace(/[_^]\{([^}]*)\}/g, '$1')));
 }
+
+const joinText = (parts) => parts.join(' ').replace(/\s+/g, ' ').trim();
 
 function metaTitle(meta) {
   const t = (meta?.info?.Title || '').trim();
@@ -169,7 +172,8 @@ function metaTitle(meta) {
 }
 
 function showTitle() {
-  const zh = state.titleBlock?.zh;
+  const blocks = state.titleBlocks || [];
+  const zh = blocks.length && blocks.every((b) => b.zh) ? joinText(blocks.map((b) => b.zh)) : '';
   const el = $('doc-title');
   el.textContent = zh || state.title;
   el.title = state.title;

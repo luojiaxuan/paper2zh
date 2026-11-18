@@ -117,6 +117,9 @@ button:focus-visible, input:focus-visible, select:focus-visible, .dropzone:focus
 .form-error { color: var(--accent); font-size: 13px; margin: 12px 0 0; text-align: left; }
 .provider-note { color: var(--muted); font-size: 13px; margin: 16px 0 0; }
 .provider-note button { font: inherit; color: var(--accent); background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+.demo { margin: 48px 0 0; }
+.demo img { display: block; width: 100%; height: auto; border-radius: 14px; border: 1px solid var(--border); box-shadow: var(--shadow); }
+.demo figcaption { margin-top: 10px; text-align: center; color: var(--muted); font-size: 13px; }
 .features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin: 56px 0 0; }
 .feature { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 20px 20px 16px; }
 .feature h3 { margin: 0 0 6px; font-size: 16px; }
