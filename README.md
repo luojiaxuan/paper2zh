@@ -36,7 +36,7 @@ Key 只保存在你自己的浏览器（localStorage），请求从浏览器直�
 2. 打开 `chrome://extensions`，打开右上角“开发者模式”。
 3. 点“加载已解压的扩展程序”，选择解压出的文件夹。
 
-本地 PDF 文件也想用扩展打开的话，在扩展详情里打开“允许访问文件网址”。不装扩展时，在[网页版](https://luojiaxuan.github.io/paper2zh/)拖入 PDF 或粘贴 arXiv 链接即可。
+扩展安装时不要求“读取所有网站”的权限：只在你点击图标的那个标签页里取 PDF（activeTab）；少数取不到的情况，会先请你允许访问那一个网站。数据去向见[隐私说明](https://luojiaxuan.github.io/paper2zh/privacy.html)。本地 PDF 文件也想用扩展打开的话，在扩展详情里打开“允许访问文件网址”。不装扩展时，在[网页版](https://luojiaxuan.github.io/paper2zh/)拖入 PDF 或粘贴 arXiv 链接即可。
 
 ## 工作原理
 

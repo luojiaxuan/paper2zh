@@ -7,3 +7,4 @@
 - 2026-11-17 PT · 译文页用“正常渲染 + 跳过文字指令的渲染”拼合来擦除原文，而不是盖白框。理由：色块背景、表格线、紧邻的图形不受影响。代价是每页多一次渲染。撤回：`viewer.js` 的 `compose` 改为填充背景色。
 - 2026-11-17 PT · Claude 默认 `claude-opus-5-5`（翻译 effort low，总结 effort medium），并开启服务端拒答回退（`fallbacks: "default"`）。撤回：设置里改模型；`providers.js` 的 `fallbackParams`。
 - 2026-11-17 PT · 仓库公开（用户要求用 GitHub Pages 发布并分享）。README 演示图用 CC BY 4.0 的 DPO 论文（arXiv 2305.18290），没有用测试时的那篇匿名在审论文。
+- 2026-11-17 PT · 为上架 Chrome 应用商店，扩展权限从 `host_permissions: <all_urls>` 改为 `activeTab` + 可选主机权限（下载失败时由用户点按钮按站点授权）。理由：安装时不再提示“读取和更改所有网站上的数据”，商店审核也不会因主机权限转入深度审核；OpenReview 这类需要登录态的站点照常走标签页内下载。代价：从别的网站链接过来、且不允许跨域的 PDF 要多点一次授权。撤回：`manifest.json` 恢复 `host_permissions`，`sources.js` 的直连下载恢复带 cookie。

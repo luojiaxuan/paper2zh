@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>paper2zh 隐私说明</title>
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="css/app.css">
+  <style>
+    body { background: var(--bg); color: var(--text); font-family: var(--ui-font); }
+    .policy { max-width: 720px; margin: 0 auto; padding: 32px 16px 64px; line-height: 1.75; font-size: 15px; }
+    .policy h1 { font-size: 26px; margin: 24px 0 4px; }
+    .policy h2 { font-size: 18px; margin: 28px 0 6px; }
+    .policy .date { color: var(--muted); font-size: 13px; }
+    .policy ul { padding-left: 1.2em; }
+    .policy hr { border: 0; border-top: 1px solid var(--border); margin: 40px 0; }
+    .policy a { color: var(--accent); }
+  </style>
+</head>
+<body>
+  <main class="policy">
+    <a class="brand" href="./"><img src="icons/icon.svg" alt="" width="28" height="28"><span>paper2zh</span></a>
+
+    <h1>隐私说明</h1>
+    <p class="date">适用于 paper2zh 网站与 Chrome 扩展 · 更新于 2026 年 11 月 17 日</p>
+
+    <p>paper2zh 没有服务器，也没有账号系统。论文的解析、排版和缓存都在你的浏览器里完成，开发者收不到你的任何数据。</p>
+
+    <h2>论文内容去了哪里</h2>
+    <p>为了翻译和生成总结，paper2zh 会把论文的文字从你的浏览器直接发给你在“模型设置”里选的服务：默认是 Google 翻译，也可以是 Anthropic（Claude）、OpenAI、DeepSeek、Google Gemini、OpenRouter，或你自己填写的兼容接口。paper2zh 发送这些文字只为完成翻译和总结；对方服务如何处理它们，以该服务的隐私政策为准。图片、图表和 PDF 文件本身不会发出去。</p>
+
+    <h2>API Key</h2>
+    <p>你填写的 API Key 保存在本机浏览器的 localStorage 里，只在请求对应服务时作为身份凭证发给该服务，不会发给其他任何地方。</p>
+
+    <h2>本地缓存</h2>
+    <p>译文和总结缓存在本机浏览器的 IndexedDB 里，下次打开同一篇论文时直接读取。清除该网站的数据，或卸载扩展，缓存随之删除。</p>
+
+    <h2>扩展读取哪些网页</h2>
+    <ul>
+      <li>只有你在某个标签页上点击 paper2zh 图标（或在链接上用右键菜单打开）时，扩展才获得这个标签页的临时访问权（activeTab），用来以你在该网站的登录状态下载这篇 PDF。</li>
+      <li>如果直接下载失败，扩展会请你确认后再访问那个网站；不确认就不访问。授权可以随时在 Chrome 的扩展管理页撤销。</li>
+      <li>扩展不读取浏览记录，不在你浏览的网页里注入广告或统计代码，也不在后台访问任何网页。</li>
+    </ul>
+
+    <h2>统计与广告</h2>
+    <p>paper2zh 不含统计、追踪或广告代码，不出售、不转让任何用户数据。</p>
+
+    <h2>联系</h2>
+    <p>有问题请在 <a href="https://github.com/luojiaxuan/paper2zh/issues" target="_blank" rel="noopener">GitHub Issues</a> 留言。源码公开在 <a href="https://github.com/luojiaxuan/paper2zh" target="_blank" rel="noopener">github.com/luojiaxuan/paper2zh</a>，可以自行核对以上说法。</p>
+
+    <hr>
+
+    <h1 lang="en">Privacy Policy</h1>
+    <p class="date" lang="en">Applies to the paper2zh website and Chrome extension · Updated November 17, 2026</p>
+    <div lang="en">
+      <p>paper2zh has no server and no accounts. Parsing, layout and caching all happen in your browser, and the developer receives none of your data.</p>
+      <h2>Paper text</h2>
+      <p>To translate and summarize, paper2zh sends the text of the paper from your browser directly to the service you choose in Settings: Google Translate by default, or Anthropic (Claude), OpenAI, DeepSeek, Google Gemini, OpenRouter, or a compatible endpoint you enter. paper2zh sends it only to produce the translation and summary; how the chosen service handles it is governed by that service's privacy policy. Images, figures and the PDF file itself are not sent.</p>
+      <h2>API keys</h2>
+      <p>API keys you enter are stored in your browser's localStorage and are sent only to the matching service, as credentials for its requests.</p>
+      <h2>Local cache</h2>
+      <p>Translations and summaries are cached in your browser's IndexedDB. Clearing the site's data or removing the extension deletes them.</p>
+      <h2>Website access</h2>
+      <ul>
+        <li>The extension gets temporary access to a tab (activeTab) only when you click the paper2zh button on it, or open a link with its context menu item. It uses that access to download the PDF with your session on that site.</li>
+        <li>If the download still fails, the extension asks for your permission before accessing that site. You can revoke it at any time on Chrome's extensions page.</li>
+        <li>The extension does not read your browsing history, does not inject ads or analytics into pages, and does not access websites in the background.</li>
+      </ul>
+      <h2>Analytics and ads</h2>
+      <p>paper2zh contains no analytics, tracking or advertising code, and does not sell or transfer user data.</p>
+      <h2>Contact</h2>
+      <p>Please open an issue on <a href="https://github.com/luojiaxuan/paper2zh/issues" target="_blank" rel="noopener">GitHub</a>. The source code is public, so every statement above can be checked.</p>
+    </div>
+  </main>
+</body>
+</html>

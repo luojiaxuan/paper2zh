@@ -33,10 +33,25 @@ function fromBase64(b64) {
   return out;
 }
 
+// Match pattern for the site a PDF lives on, as used by chrome.permissions.
+function sitePattern(url) {
+  const u = new URL(url);
+  return u.protocol === 'file:' ? 'file:///*' : `${u.protocol}//${u.host}/*`;
+}
+
+// The extension reads sites only with activeTab (the tab the user clicked the
+// button on) or with access the user granted to that site.
+const hasSiteAccess = (url) => chrome.permissions.contains({ origins: [sitePattern(url)] });
+
+export function requestSiteAccess(site) {
+  return chrome.permissions.request({ origins: [site.pattern] });
+}
+
 export async function fetchPdf(url, tabId) {
+  const granted = inExtension && (await hasSiteAccess(url));
   let direct = null;
   try {
-    const res = await fetch(url, { credentials: inExtension ? 'include' : 'omit' });
+    const res = await fetch(url, { credentials: granted ? 'include' : 'omit' });
     if (res.ok) {
       const bytes = new Uint8Array(await res.arrayBuffer());
       if (isPdf(bytes)) return bytes;
@@ -53,6 +68,11 @@ export async function fetchPdf(url, tabId) {
       const bytes = fromBase64(reply.data);
       if (isPdf(bytes)) return bytes;
     }
+  }
+  if (inExtension && !granted) {
+    const err = new Error(`${direct}。可以允许 paper2zh 读取这个网站后重试，或在原页面下载 PDF 后拖进来。`);
+    err.site = { pattern: sitePattern(url), host: new URL(url).host || '本地文件' };
+    throw err;
   }
   const hint = inExtension
     ? '可以在原页面下载 PDF 后拖进来。'

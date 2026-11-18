@@ -5,7 +5,7 @@ import { Translator } from './translate.js';
 import { Summary } from './summary.js';
 import { PROVIDERS, configProblem, getSettings, providerConfig, saveSettings } from './settings.js';
 import { createProvider } from './providers.js';
-import { fetchPdf, inExtension, pdfUrlFor } from './sources.js';
+import { fetchPdf, inExtension, pdfUrlFor, requestSiteAccess } from './sources.js';
 
 const VENDOR = new URL('../vendor/pdfjs/', import.meta.url).href;
 pdfjsLib.GlobalWorkerOptions.workerSrc = `${VENDOR}pdf.worker.min.mjs`;
@@ -72,11 +72,23 @@ async function openUrl(input, tabId) {
     bytes = await fetchPdf(url, tabId);
   } catch (e) {
     showLoading(e.message, true);
+    if (e.site) offerSiteAccess(e.site, () => openUrl(url, tabId));
     return;
   }
   const params = new URLSearchParams({ src: url });
   history.replaceState(null, '', `${location.pathname}?${params}`);
   await openBytes(bytes, decodeURIComponent(url.split('/').pop() || url));
+}
+
+function offerSiteAccess(site, retry) {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'btn primary';
+  btn.textContent = `允许读取 ${site.host} 并重试`;
+  btn.addEventListener('click', async () => {
+    if (await requestSiteAccess(site)) retry();
+  });
+  pagesRoot.querySelector('.loading-doc .err').after(btn);
 }
 
 async function openFile(file) {
