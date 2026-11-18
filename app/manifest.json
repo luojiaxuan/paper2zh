@@ -1,0 +1,15 @@
+{
+  "manifest_version": 3,
+  "name": "paper2zh · 论文一键中文",
+  "short_name": "paper2zh",
+  "version": "0.1.0",
+  "description": "在论文 PDF 页面点一下，打开保留原版式的中文译本和 AI 速读总结。",
+  "action": {
+    "default_title": "把这篇 PDF 翻成中文",
+    "default_icon": { "16": "icons/icon16.png", "32": "icons/icon32.png", "48": "icons/icon48.png", "128": "icons/icon128.png" }
+  },
+  "icons": { "16": "icons/icon16.png", "32": "icons/icon32.png", "48": "icons/icon48.png", "128": "icons/icon128.png" },
+  "background": { "service_worker": "background.js", "type": "module" },
+  "permissions": ["scripting", "contextMenus"],
+  "host_permissions": ["<all_urls>"]
+}

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <rect x="6" y="4" width="40" height="52" rx="5" fill="#ffffff" stroke="#1f1e1c" stroke-width="3"/>
+  <path d="M14 16h24M14 23h24M14 30h16" stroke="#1f1e1c" stroke-width="3" stroke-linecap="round"/>
+  <rect x="26" y="30" width="34" height="30" rx="7" fill="#b23a2e"/>
+  <text x="43" y="52.5" text-anchor="middle" font-family="PingFang SC, Songti SC, Noto Sans CJK SC, sans-serif" font-size="20" font-weight="700" fill="#ffffff">中</text>
+</svg>
