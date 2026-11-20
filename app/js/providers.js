@@ -1,19 +1,20 @@
 // Translation and summary backends: Claude through the Anthropic SDK, any
 // OpenAI-compatible chat endpoint, and the free Google Translate endpoint.
 
-export const PROMPT_VERSION = 2;
+export const PROMPT_VERSION = 3;
 
 const TRANSLATE_SYSTEM = `You translate academic papers into Simplified Chinese for researchers who read Chinese faster than English.
 
-Input is JSON {"paper": title, "blocks": [{"id", "type", "text"}]}: the text blocks of one PDF page, in reading order. The text comes from PDF extraction: line breaks are removed, a word broken at a line end may appear as "represen-tation", subscripts and superscripts are marked _{...} and ^{...}, and **...** marks bold text.
+Input is JSON {"paper": title, "blocks": [{"id", "type", "text"}]}: the text blocks of one PDF page, in reading order. The text comes from PDF extraction: line breaks are removed, a word broken at a line end may appear as "represen-tation", **...** marks bold text, and remaining subscripts and superscripts are marked _{...} and ^{...}. Formulas and citations have been cut out and replaced by placeholders ⟦1⟧, ⟦2⟧, ...; they are typeset from the original page.
 
 Return JSON {"translations": [{"id", "zh"}]} with exactly one entry per input block, using the same ids.
 
 How to translate:
 - Faithful, fluent academic Chinese. Do not summarize, shorten, explain or add anything.
+- Copy every placeholder ⟦n⟧ exactly once and unchanged to where its formula or citation belongs in the Chinese sentence. Never translate, drop or merge placeholders, and never put them inside $...$.
 - Keep in English: names of models, datasets, benchmarks, methods, systems and people; code, file paths, URLs; citations such as (Smith et al., 2023) or [12]; abbreviations. A key technical term may carry its English in parentheses the first time it appears in a block, e.g. 奖励欺骗（reward hacking）.
-- Write mathematics as LaTeX inside $...$, e.g. $x_t \\in \\mathbb{R}^d$, repairing the broken extraction when the intended formula is clear. Keep numbers and units unchanged.
-- Keep **bold** markers around the corresponding Chinese words.
+- Write any other mathematics as LaTeX inside $...$, e.g. $x_t \\in \\mathbb{R}^d$, repairing the broken extraction when the intended formula is clear. Keep numbers and units unchanged.
+- Keep the **bold** markers: each bold span of the input stays bold, around the corresponding Chinese words.
 - type "heading": translate the heading and keep its numbering (3.1, A.2, ...).
 - type "caption": render the label in Chinese, e.g. "Figure 3:" becomes "图 3：" and "Table 2:" becomes "表 2：". Sub-figure captions such as "(a) Accuracy by model size" are captions too: translate them.
 - Use "" as zh for blocks that should stay in English: author names, affiliations, email addresses, bibliography entries, code, pseudocode, prompts or program output shown verbatim, standalone formulas, page headers and footers, and fragments of figures or tables.`;
@@ -336,7 +337,15 @@ class OpenAICompatibleProvider {
 
 // ---------- Google Translate (free endpoint, no key) ----------
 
-const plain = (b) => b.text.replace(/[_^]\{([^}]*)\}/g, '$1');
+const plain = (s) => s.replace(/\*\*/g, '').replace(/[_^]\{([^}]*)\}/g, '$1').trim();
+
+// Text pieces sent for one block. A leading bold sentence (a run-in heading
+// such as "Results.") goes on its own line so its bold can be restored.
+function googlePieces(b) {
+  const src = b.rich || b.text;
+  const runIn = src.match(/^\*\*([^*]+?[.:?!])\*\*\s*(\S[\s\S]*)$/);
+  return runIn ? [plain(runIn[1]), plain(runIn[2])] : [plain(src)];
+}
 
 const GOOGLE_BLOCKED =
   'Google 翻译暂时拦下了来自你这个网络的请求：短时间内请求太多，被当成了异常流量，通常几小时内恢复。可以稍后点“重试”，或换成大模型服务。';
@@ -369,13 +378,18 @@ class GoogleProvider {
   }
 
   async translate(blocks, _paper, signal) {
-    const texts = blocks.map(plain);
+    const pieces = blocks.map(googlePieces);
+    const texts = pieces.flat();
     let parts = await this.request(texts, signal);
     if (parts.length !== texts.length) {
       parts = [];
       for (const t of texts) parts.push((await this.request([t], signal)).join(' '));
     }
-    return new Map(blocks.map((b, i) => [b.id, parts[i].trim()]));
+    let k = 0;
+    return new Map(blocks.map((b, i) => {
+      const zh = pieces[i].map(() => parts[k++].trim());
+      return [b.id, zh.length === 2 ? `**${zh[0]}** ${zh[1]}` : zh[0]];
+    }));
   }
 }
 

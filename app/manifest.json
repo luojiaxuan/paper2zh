@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "paper2zh · 论文一键中文",
   "short_name": "paper2zh",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "在 arXiv、OpenReview 等论文 PDF 页面点一下，打开保留原版式的中文译本：图表公式不动，只换正文，附 AI 速读总结。",
   "action": {
     "default_title": "把这篇 PDF 翻成中文",

@@ -195,12 +195,30 @@ button:focus-visible, input:focus-visible, select:focus-visible, .dropzone:focus
   overflow: visible; word-break: break-word; overflow-wrap: anywhere; border-radius: 1px; cursor: default;
 }
 .font-sans .zh-block { font-family: var(--zh-sans); }
-.zh-block.heading { font-weight: 700; text-align: left; }
-.zh-block.caption { text-align: justify; }
+.zh-block.heading { text-align: left; }
+.zh-block.bold { font-weight: 700; }
+.zh-block.center { text-align: center; }
+.zh-block .formula { display: inline-block; position: relative; }
+.zh-block .formula canvas { position: absolute; left: 0; width: 100%; pointer-events: none; }
+.zh-block .nobr { white-space: nowrap; }
+.zh-block sup.cite {
+  font-size: .56em; line-height: 0; vertical-align: .75em; margin: 0 .1em; white-space: normal;
+  color: #2f5f9e; cursor: pointer; font-weight: 400;
+}
+.zh-block sup.cite:hover { text-decoration: underline; }
 .zh-block:hover { background: rgb(178 58 46 / 7%); box-shadow: 0 0 0 2px rgb(178 58 46 / 7%); }
 .zh-block .katex { font-size: 1em; }
 .zh-block b, .zh-block strong { font-weight: 700; }
 
+.cite-pop {
+  position: fixed; z-index: 51; width: min(460px, calc(100vw - 32px)); max-height: 50vh; overflow: auto;
+  background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 10px;
+  box-shadow: var(--shadow); padding: 4px 12px; font: 13px/1.55 Georgia, "Times New Roman", serif;
+}
+.cite-pop .ref { padding: 8px 0; }
+.cite-pop .ref + .ref { border-top: 1px solid var(--border); }
+.cite-pop p { margin: 0 0 4px; }
+.cite-pop button { border: 0; background: none; padding: 0; color: var(--accent); font: 12px var(--ui-font); cursor: pointer; }
 .tooltip {
   position: fixed; z-index: 50; max-width: min(560px, calc(100vw - 32px)); max-height: 50vh; overflow: auto;
   background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 10px;

@@ -8,3 +8,4 @@
 - 2026-11-17 PT · Claude 默认 `claude-opus-5-5`（翻译 effort low，总结 effort medium），并开启服务端拒答回退（`fallbacks: "default"`）。撤回：设置里改模型；`providers.js` 的 `fallbackParams`。
 - 2026-11-17 PT · 仓库公开（用户要求用 GitHub Pages 发布并分享）。README 演示图用 CC BY 4.0 的 DPO 论文（arXiv 2305.18290），没有用测试时的那篇匿名在审论文。
 - 2026-11-17 PT · 为上架 Chrome 应用商店，扩展权限从 `host_permissions: <all_urls>` 改为 `activeTab` + 可选主机权限（下载失败时由用户点按钮按站点授权）。理由：安装时不再提示“读取和更改所有网站上的数据”，商店审核也不会因主机权限转入深度审核；OpenReview 这类需要登录态的站点照常走标签页内下载。代价：从别的网站链接过来、且不允许跨域的 PDF 要多点一次授权。撤回：`manifest.json` 恢复 `host_permissions`，`sources.js` 的直连下载恢复带 cookie。
+- 2026-11-19 PT · 行内公式改为按数学字体识别、换成占位符 `⟦n⟧` 送翻译，译文里贴回原页面上的字形（只取墨迹像素）；独立公式整块不擦不译；引用在能查到参考文献条目时换成小号上标（作者-年份缩成“姓 年份”），点开显示条目。此前由模型把打碎的公式写成 LaTeX 再用 KaTeX 渲染，用户反馈公式被改写、版式被打乱、引用占篇幅。代价：Google 翻译下占位符能否原样保留尚未实测（本机 IP 仍被 Google 限流）；占位符丢失的段落会单独重试一次，仍丢失则保留原文。撤回：`layout.js` 的 `mathRuns` 全返回 -1、`markCitations` 直接返回，即回到整段送模型。

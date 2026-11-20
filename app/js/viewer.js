@@ -1,9 +1,13 @@
 // Renders pages and lays the Chinese translation over them. The translated
 // sheet is the original page with the original text of translated blocks
-// erased (copied from a text-free render, so backgrounds, rules and figures
-// stay pixel-identical) and an HTML layer of fitted Chinese text on top.
+// erased (copied from a render without text and without the rules inside
+// those blocks, so backgrounds and figures stay pixel-identical) and an HTML
+// layer of fitted Chinese text on top. Inline formulas in that text are
+// pieces of the original render; citations are small superscripts that open
+// their bibliography entries.
 
-import { inline } from './richtext.js';
+import { escapeHtml, inline } from './richtext.js';
+import { FORMULA_REACH } from './layout.js';
 
 const MAX_CANVAS_PIXELS = 6e6;
 const KEEP_PAGES = 3;
@@ -13,13 +17,16 @@ const LINE_HEIGHTS = ['1.36', '1.28', '1.2'];
 // the bottom of its last; CSS line boxes add half of the leading above and
 // below, so the box is padded by that much.
 const HALF_LEADING = 0.2;
+// Margin around an inline formula cut from the original render, in points.
+const FORMULA_PAD = 0.6;
 const fontSizeOf = (b) => (b.kind === 'heading' ? b.maxSize : b.size);
 
 export class Viewer {
-  constructor({ root, pdf, OPS, pages, tooltip, onRetry, getFont }) {
+  constructor({ root, pdf, OPS, pages, refs, tooltip, onRetry, getFont }) {
     this.root = root;
     this.pdf = pdf;
     this.pages = pages;
+    this.refs = refs;
     this.tooltip = tooltip;
     this.onRetry = onRetry;
     this.getFont = getFont;
@@ -41,6 +48,20 @@ export class Viewer {
     root.addEventListener('mouseout', (e) => {
       if (e.target.closest?.('.zh-block')) this.tooltip.hidden = true;
     });
+    this.citePop = document.createElement('div');
+    this.citePop.className = 'cite-pop';
+    this.citePop.hidden = true;
+    document.body.appendChild(this.citePop);
+    this.citePop.addEventListener('click', (e) => {
+      const jump = e.target.closest('[data-ref]');
+      if (jump) this.jumpToRef(this.refs[Number(jump.dataset.ref)]);
+    });
+    root.addEventListener('click', (e) => {
+      const sup = e.target.closest?.('sup.cite');
+      if (sup) this.showCitation(sup);
+      else this.citePop.hidden = true;
+    });
+    root.addEventListener('scroll', () => { this.citePop.hidden = true; }, { passive: true });
   }
 
   makeRow(p) {
@@ -214,13 +235,15 @@ export class Viewer {
     const ctx = zh.getContext('2d');
     ctx.drawImage(r.canvasEn, 0, 0);
     const blocks = p.blocks.filter((b) => b.zh);
+    let bare = null;
     if (blocks.length) {
-      const bare = makeCanvas(viewport);
+      bare = makeCanvas(viewport);
+      const rules = new Set(blocks.flatMap((b) => b.rules || []));
       try {
         await page.render({
           canvas: bare,
           viewport,
-          operationsFilter: (i, ops) => !this.textOps.has(ops.fnArray[i]),
+          operationsFilter: (i, ops) => !this.textOps.has(ops.fnArray[i]) && !rules.has(i),
         }).promise;
       } catch (e) {
         console.error(`page ${p.n} text-free render failed`, e);
@@ -238,15 +261,17 @@ export class Viewer {
           if (w > 0 && h > 0) ctx.drawImage(bare, x, y, w, h, x, y, w, h);
         }
       }
-      bare.width = bare.height = 0;
     }
     if (token !== r.token) return;
     replaceCanvas(r.sheetZh, r.canvasZh, zh);
     r.canvasZh = zh;
-    this.buildLayer(r, blocks);
+    this.buildLayer(r, blocks, bare);
+    if (bare) bare.width = bare.height = 0;
   }
 
-  buildLayer(r, blocks) {
+  // `bare` is the page rendered without text, for clearing neighbors out of
+  // formula images.
+  buildLayer(r, blocks, bare) {
     r.layer?.remove();
     r.layer = null;
     if (!blocks.length) return;
@@ -258,13 +283,16 @@ export class Viewer {
     for (const b of blocks) {
       const el = document.createElement('div');
       const pad = HALF_LEADING * fontSizeOf(b);
-      el.className = `zh-block ${b.kind}`;
+      el.className = `zh-block ${b.kind}${b.allBold ? ' bold' : ''}${b.center ? ' center' : ''}`;
       el.dataset.id = b.id;
       el.style.left = `${b.bbox[0]}px`;
       el.style.top = `${b.bbox[1] - pad}px`;
       el.style.width = `${b.bbox[2] - b.bbox[0]}px`;
       el.style.height = `${b.bbox[3] - b.bbox[1] + 2 * pad}px`;
-      el.innerHTML = inline(b.zh);
+      el.innerHTML = `<div class="zh-in">${inline(b.zh, (n, pre, post) => placeholderHtml(b, n, pre, post))}</div>`;
+      for (const f of el.querySelectorAll('.formula')) {
+        f.appendChild(cutFormula(r, b, b.spans[f.dataset.n - 1], Number(f.dataset.x0), Number(f.dataset.x1), bare));
+      }
       layer.appendChild(el);
     }
     r.sheetZh.appendChild(layer);
@@ -293,10 +321,11 @@ export class Viewer {
       }
       const size = fontSizeOf(b);
       const boxH = b.bbox[3] - b.bbox[1] + 2 * HALF_LEADING * size;
+      // The text's own height: formula images may reach outside it.
       const fits = (s, lh) => {
         el.style.fontSize = `${s}px`;
         el.style.lineHeight = lh;
-        return el.scrollHeight <= boxH + 0.6;
+        return el.firstChild.offsetHeight <= boxH + 0.6;
       };
       let fit = null;
       for (const lh of LINE_HEIGHTS) {
@@ -319,6 +348,30 @@ export class Viewer {
       }
       b.fit = { font, zh: b.zh, ...fit };
     }
+  }
+
+  showCitation(sup) {
+    const el = sup.closest('.zh-block');
+    const n = Number(el.closest('.page-row').dataset.page);
+    const b = this.pages[n - 1].blocks.find((x) => x.id === el.dataset.id);
+    const span = b.spans[sup.dataset.n - 1];
+    const pop = this.citePop;
+    pop.innerHTML = span.refs.map((i) => `<div class="ref"><p>${escapeHtml(this.refs[i].text)}</p>` +
+      `<button type="button" data-ref="${i}">跳到参考文献（第 ${this.refs[i].page} 页）</button></div>`).join('');
+    this.tooltip.hidden = true;
+    pop.hidden = false;
+    const rect = sup.getBoundingClientRect();
+    const box = pop.getBoundingClientRect();
+    let top = rect.bottom + 6;
+    if (top + box.height > window.innerHeight - 8) top = Math.max(8, rect.top - box.height - 6);
+    pop.style.top = `${top}px`;
+    pop.style.left = `${Math.min(Math.max(8, rect.left - 12), window.innerWidth - box.width - 8)}px`;
+  }
+
+  jumpToRef(entry) {
+    this.citePop.hidden = true;
+    const r = this.rows[entry.page - 1];
+    this.root.scrollTop = r.row.offsetTop + entry.y * (r.cssW / r.p.width) - 48;
   }
 
   refit() {
@@ -387,11 +440,73 @@ export class Viewer {
   }
 
   destroy() {
+    this.citePop.remove();
     this.observer.disconnect();
     this.resizeObserver.disconnect();
     for (const r of this.rows) this.release(r);
     this.root.replaceChildren();
   }
+}
+
+// Placeholder ⟦n⟧ of a translated block, with the punctuation `pre` and
+// `post` that must stay on the same line as its first and last piece. An
+// inline formula keeps the size and baseline it has on the page, in em of
+// the block's font so it scales with the fitted text, as image pieces that
+// can wrap where TeX would break it. A citation is a small superscript.
+function placeholderHtml(b, n, pre, post) {
+  const span = b.spans[n - 1];
+  const glue = (html) => `<span class="nobr">${html}</span>`;
+  if (span.kind === 'cite') {
+    const sup = `<sup class="cite" data-n="${n}">${escapeHtml(span.label)}</sup>`;
+    return pre || post ? glue(pre + sup + post) : sup;
+  }
+  const em = (v) => `${(v / fontSizeOf(b)).toFixed(3)}em`;
+  const [x0, y0, x1, y1] = span.box;
+  const xs = [x0 - FORMULA_PAD, ...span.breaks, x1 + FORMULA_PAD];
+  const pieces = [];
+  for (let i = 0; i + 1 < xs.length; i++) {
+    pieces.push(`<span class="formula" data-n="${n}" data-x0="${xs[i]}" data-x1="${xs[i + 1]}" style="width:${em(xs[i + 1] - xs[i])};` +
+      `height:${em(y1 - y0 + 2 * FORMULA_PAD)};vertical-align:${em(span.base - y1 - FORMULA_PAD)}"></span>`);
+  }
+  const last = pieces.length - 1;
+  if (pre || (post && !last)) pieces[0] = glue(pre + pieces[0] + (last ? '' : post));
+  if (post && last) pieces[last] = glue(pieces[last] + post);
+  return pieces.join('<wbr>');
+}
+
+// The ink of a formula piece (x from x0 to x1) from the original render: the
+// pixels that differ from the render without text, so the image is
+// transparent elsewhere and may reach past its box without covering the
+// Chinese text. Other text reaching into it is cleared.
+function cutFormula(r, b, span, x0, x1, bare) {
+  const k = r.viewport.scale;
+  const size = fontSizeOf(b);
+  const top = span.box[1] - FORMULA_REACH * size;
+  const bottom = span.box[3] + FORMULA_REACH * size;
+  const sx = Math.max(0, Math.floor(x0 * k));
+  const sy = Math.max(0, Math.floor(top * k));
+  const c = document.createElement('canvas');
+  c.width = Math.max(0, Math.min(r.canvasEn.width - sx, Math.ceil((x1 - x0) * k)));
+  c.height = Math.max(0, Math.min(r.canvasEn.height - sy, Math.ceil((bottom - top) * k)));
+  c.style.top = `${((top - span.box[1] + FORMULA_PAD) / size).toFixed(3)}em`;
+  c.style.height = `${((bottom - top) / size).toFixed(3)}em`;
+  if (!c.width || !c.height) return c;
+  const ctx = c.getContext('2d', { willReadFrequently: true });
+  ctx.drawImage(r.canvasEn, sx, sy, c.width, c.height, 0, 0, c.width, c.height);
+  const img = ctx.getImageData(0, 0, c.width, c.height);
+  const ink = img.data;
+  const ground = bare.getContext('2d').getImageData(sx, sy, c.width, c.height).data;
+  for (let i = 0; i < ink.length; i += 4) {
+    const d = Math.abs(ink[i] - ground[i]) + Math.abs(ink[i + 1] - ground[i + 1]) + Math.abs(ink[i + 2] - ground[i + 2]);
+    if (d < 8) ink[i + 3] = 0;
+  }
+  for (const m of span.mask) {
+    const mx0 = Math.max(0, Math.floor(m[0] * k) - sx), mx1 = Math.min(c.width, Math.ceil(m[2] * k) - sx);
+    const my0 = Math.max(0, Math.floor(m[1] * k) - sy), my1 = Math.min(c.height, Math.ceil(m[3] * k) - sy);
+    for (let y = my0; y < my1; y++) for (let x = mx0; x < mx1; x++) ink[(y * c.width + x) * 4 + 3] = 0;
+  }
+  ctx.putImageData(img, 0, 0);
+  return c;
 }
 
 function makeCanvas(viewport) {

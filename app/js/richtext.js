@@ -1,9 +1,11 @@
-// Inline rich text: escapes HTML, renders $...$ with KaTeX and **...** as bold.
+// Inline rich text: escapes HTML, renders $...$ with KaTeX, **...** as bold and
+// placeholders ⟦n⟧ through a caller-supplied function, which also gets the
+// punctuation directly before and after the placeholder to keep on its line.
 // Also a small Markdown renderer for the summary panel.
 
 import katex from '../vendor/katex/katex.mjs';
 
-const escapeHtml = (s) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+export const escapeHtml = (s) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
 function math(tex) {
   try {
@@ -13,24 +15,25 @@ function math(tex) {
   }
 }
 
-export function inline(text) {
+export function inline(text, placeholder = (n, pre, post) => pre + post) {
   const parts = [];
   const re = /\$([^$\n]{1,400}?)\$/g;
   let last = 0;
   let m;
   while ((m = re.exec(text))) {
-    parts.push(formatText(text.slice(last, m.index)));
+    parts.push(formatText(text.slice(last, m.index), placeholder));
     parts.push(math(m[1]));
     last = m.index + m[0].length;
   }
-  parts.push(formatText(text.slice(last)));
+  parts.push(formatText(text.slice(last), placeholder));
   return parts.join('');
 }
 
-function formatText(s) {
+function formatText(s, placeholder) {
   return escapeHtml(s)
     .replace(/\*\*([^*]+?)\*\*/g, '<b>$1</b>')
-    .replace(/`([^`]+?)`/g, '<code>$1</code>');
+    .replace(/`([^`]+?)`/g, '<code>$1</code>')
+    .replace(/([（(「“‘]*)⟦(\d+)⟧([，。、；：！？）」”’,.;:!?)]*)/g, (_, pre, n, post) => placeholder(Number(n), pre, post));
 }
 
 // Headings (###), bullet and numbered lists, paragraphs.

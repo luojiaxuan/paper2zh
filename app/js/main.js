@@ -1,5 +1,5 @@
 import * as pdfjsLib from '../vendor/pdfjs/pdf.min.mjs';
-import { analyzeDocument, figureRegions, textItems, TRANSLATABLE } from './layout.js';
+import { analyzeDocument, pageGraphics, textItems, TRANSLATABLE } from './layout.js';
 import { Viewer } from './viewer.js';
 import { Translator } from './translate.js';
 import { Summary } from './summary.js';
@@ -135,7 +135,7 @@ async function openBytes(bytes, name) {
           return '';
         }
       };
-      return { width: viewport.width, height: viewport.height, items: textItems(tc, viewport, fontName), regions: figureRegions(ops, pdfjsLib.OPS, viewport) };
+      return { width: viewport.width, height: viewport.height, items: textItems(tc, viewport, fontName), ...pageGraphics(ops, pdfjsLib.OPS, viewport) };
     });
   } catch (e) {
     console.error(e);
@@ -154,6 +154,7 @@ async function openBytes(bytes, name) {
     pdf: state.doc,
     OPS: pdfjsLib.OPS,
     pages: state.analysis.pages,
+    refs: state.analysis.refs,
     tooltip: $('tooltip'),
     onRetry: (n) => state.translator?.retry(n),
     getFont: () => getSettings().font,
@@ -185,7 +186,7 @@ function metaTitle(meta) {
 
 function showTitle() {
   const blocks = state.titleBlocks || [];
-  const zh = blocks.length && blocks.every((b) => b.zh) ? joinText(blocks.map((b) => b.zh)) : '';
+  const zh = blocks.length && blocks.every((b) => b.zh) ? joinText(blocks.map((b) => b.zh.replace(/⟦\d+⟧/g, ''))) : '';
   const el = $('doc-title');
   el.textContent = zh || state.title;
   el.title = state.title;

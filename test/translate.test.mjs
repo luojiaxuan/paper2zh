@@ -90,3 +90,34 @@ test('a service-level refusal stops the queue and retryFailed resumes it', async
   assert.deepEqual([...t.state.values()], ['done', 'done', 'done', 'done', 'done']);
   assert.equal(last.fatal, null);
 });
+
+test('a translation that loses a placeholder is asked again alone, then keeps the original', async () => {
+  const analysis = { pages: [page(1, ['where ⟦1⟧ holds', 'plain', 'with ⟦1⟧ and ⟦2⟧'])] };
+  const calls = [];
+  const t = new Translator({
+    analysis,
+    cfg: { id: 'fake', kind: 'openai', translateModel: 'm', concurrency: 1 },
+    paper: 'p',
+    priority: (n) => n,
+    onPage: () => {},
+    onState: () => {},
+    onProgress: () => {},
+  });
+  let first = true;
+  t.provider = {
+    async translate(blocks) {
+      calls.push(blocks.length);
+      const out = new Map(blocks.map((b) => [b.id, `中文 ${b.text}`]));
+      // The first answer drops ⟦2⟧ and spaces ⟦1⟧; the retry fixes the first block only.
+      out.set('1-2', '中文 ⟦1⟧');
+      if (first) out.set('1-0', '中文 ⟦ 1 ⟧ 成立');
+      else out.set('1-0', '其中 ⟦1⟧ 成立');
+      first = false;
+      return out;
+    },
+  };
+  await t.start();
+  await new Promise((r) => setTimeout(r, 50));
+  assert.deepEqual(analysis.pages[0].blocks.map((b) => b.zh), ['中文 ⟦1⟧ 成立', '中文 plain', '']);
+  assert.deepEqual(calls, [3, 1]);
+});

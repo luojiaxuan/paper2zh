@@ -8,6 +8,8 @@ import * as store from './store.js';
 const CHUNK_CHARS = { google: 4000, llm: 7000 };
 const MAX_ATTEMPTS = 3;
 
+const placeholders = (s) => (s.match(/⟦\d+⟧/g) || []).sort().join();
+
 export class Translator {
   constructor({ analysis, cfg, paper, priority, onPage, onState, onProgress }) {
     this.pages = analysis.pages;
@@ -168,7 +170,10 @@ export class Translator {
   // When the model rejects a request (a safety filter, malformed output),
   // bisect it so one problematic paragraph does not cost the whole page.
   // A single rejected paragraph stays in the original language.
-  async translateChunk(chunk) {
+  // A translation that loses or repeats a placeholder would drop or double
+  // a formula or citation: such blocks get one more request on their own,
+  // then keep the original text.
+  async translateChunk(chunk, isRetry = false) {
     let result;
     try {
       result = await this.provider.translate(chunk, this.paper, this.controller.signal);
@@ -179,18 +184,27 @@ export class Translator {
         return;
       }
       const mid = Math.ceil(chunk.length / 2);
-      await this.translateChunk(chunk.slice(0, mid));
-      await this.translateChunk(chunk.slice(mid));
+      await this.translateChunk(chunk.slice(0, mid), isRetry);
+      await this.translateChunk(chunk.slice(mid), isRetry);
       return;
     }
     const entries = [];
+    const broken = [];
     for (const b of chunk) {
-      const zh = result.get(b.id);
+      let zh = result.get(b.id);
       if (zh === null || zh === undefined) continue;
+      zh = zh.replace(/⟦\s*(\d+)\s*⟧/g, '⟦$1⟧');
+      if (zh && placeholders(zh) !== placeholders(b.rich || b.text)) {
+        broken.push(b);
+        continue;
+      }
       b.zh = zh;
       entries.push([this.key(b), zh]);
     }
     store.putMany(entries);
+    if (!broken.length) return;
+    if (isRetry) for (const b of broken) b.zh = '';
+    else for (const b of broken) await this.translateChunk([b], true);
   }
 
   report() {
